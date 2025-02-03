@@ -42,3 +42,22 @@ func VerifyJWT(tokenString string) (bool, error) {
 	}
 	return token.Valid, nil
 }
+
+/* DecodeJWT is a function that decodes a JWT token and returns the claims
+ * It takes a tokenString as a parameter and returns a map of claims and an error
+ * The map of claims contains the information stored in the token
+ * The error is nil if the token is decoded successfully, otherwise it contains an error message
+ */
+func DecodeJWT(tokenString string) (jwt.MapClaims, error) {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(developmentSecret), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error parsing JWT token: %w", err)
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid JWT token")
+	}
+	return claims, nil
+}
