@@ -10,6 +10,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func Test() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		switch r.Method {
+		case http.MethodGet:
+			json.NewEncoder(w).Encode("Hello World")
+		case http.MethodPost:
+			json.NewEncoder(w).Encode("Hello World Created")
+		case http.MethodPut:
+			json.NewEncoder(w).Encode("Hello World Updated")
+		case http.MethodDelete:
+			json.NewEncoder(w).Encode("Hello World Deleted")
+		}
+	}
+}
+
 func CreateUser(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var user models.User
