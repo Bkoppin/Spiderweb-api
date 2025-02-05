@@ -1,20 +1,18 @@
 package main
 
 import (
-	"api/internal/app/auth"
-	"fmt"
+	controller "api/internal/app/http"
+	"api/internal/app/router"
 )
 
 func main() {
-	token, err := auth.CreateJWT("admin")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(token)
+	// Create a new router
+	router := router.NewRouter()
+	// Add routes to the router
+	router.Handle("/api/v1/auth/login", controller.Test())
 
-	fmt.Println(auth.VerifyJWT(token))
-	fmt.Println(auth.VerifyJWT("invalid token"))
-	fmt.Println(auth.DecodeJWT(token))
+	// Start the server on port 8080
+	router.Serve(8080)
 
 }
+
