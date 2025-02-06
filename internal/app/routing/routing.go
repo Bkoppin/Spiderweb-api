@@ -5,23 +5,14 @@ import (
 	"net/http"
 )
 
-type Method string
 
 type Middleware func(w http.ResponseWriter, req *http.Request) error
-
-const (
-	GET     Method = "GET"
-	POST    Method = "POST"
-	DELETE  Method = "DELETE"
-	PATCH   Method = "PATCH"
-	OPTIONS Method = "OPTIONS"
-	HEAD    Method = "HEAD"
-)
 
 type Route struct {
 	Path string
 	Handler http.HandlerFunc
 	Middleware []Middleware
+	Method string
 }
 
 type Router struct {
@@ -45,7 +36,7 @@ func (r *Router) Use(middleware Middleware) {
 	r.Middleware = append(r.Middleware, middleware)
 }
 
-func (r *Router) useMiddleware(next http.HandlerFunc) http.HandlerFunc {
+func (r *Router) useMiddleware(next http.HandlerFunc, route Route) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		for _, middleware := range r.Middleware {
 			err := middleware(w, req)
@@ -53,14 +44,21 @@ func (r *Router) useMiddleware(next http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 		}
+		if (req.Method == route.Method) {
 		next(w, req)
-}
+		return
+		}
+
+		http.Error(w, "404 Not Found", http.StatusNotFound)
+	}
 }
 
 // Handle adds a new route to the router
-func (r *Router) Handle(path string, handler http.HandlerFunc) {
-	r.Routes = append(r.Routes, Route{Path: path, Handler: handler})
-	http.HandleFunc(path, r.useMiddleware(handler))
+func (r *Router) Handle(path string, handler http.HandlerFunc, method string) {
+	r.Routes = append(r.Routes, Route{Path: path, Handler: handler, Method: method})
+	currentRoute := Route{Path: path, Handler: handler, Method: method}
+
+	http.HandleFunc(path, r.useMiddleware(handler, currentRoute))
 }
 
 func (r *Router) Serve(port int, options ...ServeOptions) {
