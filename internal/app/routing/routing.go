@@ -1,4 +1,4 @@
-package router
+package routing
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ const (
 )
 
 type Route struct {
-	Pattern string
+	Path string
 	Handler http.HandlerFunc
 	Middleware []Middleware
 }
@@ -29,17 +29,23 @@ type Router struct {
 	Middleware []Middleware
 }
 
-// NewRouter creates a new router
-func NewRouter() *Router {
+type ServeOptions struct {
+	Message string
+}
+
+// Creates a new Router object.
+func New() *Router {
 	return &Router{}
 }
 
-// Use applies middleware to all routes
+/* Use applies middleware to all routes
+	 Takes a middleware function as an argument and adds it to the Router's Middleware slice.
+*/
 func (r *Router) Use(middleware Middleware) {
 	r.Middleware = append(r.Middleware, middleware)
 }
 
-func (r *Router) Usemiddleware(next http.HandlerFunc) http.HandlerFunc {
+func (r *Router) useMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		for _, middleware := range r.Middleware {
 			err := middleware(w, req)
@@ -52,14 +58,18 @@ func (r *Router) Usemiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // Handle adds a new route to the router
-func (r *Router) Handle(pattern string, handler http.HandlerFunc) {
-	r.Routes = append(r.Routes, Route{Pattern: pattern, Handler: handler})
-	http.HandleFunc(pattern, r.Usemiddleware(handler))
+func (r *Router) Handle(path string, handler http.HandlerFunc) {
+	r.Routes = append(r.Routes, Route{Path: path, Handler: handler})
+	http.HandleFunc(path, r.useMiddleware(handler))
 }
 
-func (r *Router) Serve(port int) {
-	fmt.Printf("Starting server on port %d\n", port)
+func (r *Router) Serve(port int, options ...ServeOptions) {
+	fmt.Printf("Server started on port %d\n", port)
+	if len(options) > 0 {
+		fmt.Println(options[0].Message)
+	}
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	
 }
 
 
