@@ -133,7 +133,13 @@ func LoginUser(db *gorm.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Authorization", token)
+		http.SetCookie(w, &http.Cookie{
+			Name:  "token",
+			Value: token,
+			SameSite: http.SameSiteLaxMode,
+			HttpOnly: true,
+			MaxAge: 60 * 60 * 24 * 7,
+		})
 		json.NewEncoder(w).Encode(dbUser)
 	}
 }
