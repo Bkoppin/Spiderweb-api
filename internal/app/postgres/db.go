@@ -1,17 +1,26 @@
-package db
+package postgres
 
 import (
+	"api/internal/app/models"
+	"os"
+
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 // Connect is a function that connects to the database
 func Connect() (*gorm.DB, error) {
-	dsn := "host=localhost user=postgres password=postgres dbname=spiderweb port=5432 sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	err := godotenv.Load()
 	if err != nil {
 		return nil, err
 	}
+	dbName := os.Getenv("POSTGRES_URI")
+	db, err := gorm.Open(postgres.Open(dbName), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+	db.AutoMigrate(&models.User{})
 	return db, nil
 }
 
