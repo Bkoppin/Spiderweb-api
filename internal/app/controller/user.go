@@ -26,8 +26,13 @@ func CreateUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 		http.Error(w, res.Error.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	data := map[string]interface{}{
+		"username": user.Username,
+		"id":   user.ID,
+	}
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(data)
 
 }
 
@@ -89,7 +94,7 @@ func Login(w http.ResponseWriter, r *http.Request, context routing.Context) {
 
 		w.WriteHeader(http.StatusOK)
 		data := map[string]interface{}{
-			"user": dbUser.Username,
+			"username": dbUser.Username,
 			"id":   dbUser.ID,
 		}
 		json.NewEncoder(w).Encode(data)

@@ -12,7 +12,7 @@ func main() {
 	router.Use(middleware.ContentTypeJSON)
 	router.Handle("/api/users", controller.CreateUser, "POST")
 	router.Handle("/api/users/{id}", controller.GetUser, "GET")
-	router.Handle("/api/auth/login", controller.Login, "POST", middleware.WithAuth)
+	router.Handle("/api/auth/login", controller.Login, "POST")
 	router.Serve(8080, routing.ServeOptions{Message: "http://localhost:8080",})
 
 }
