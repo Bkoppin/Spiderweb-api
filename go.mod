@@ -9,6 +9,8 @@ require (
 	gorm.io/gorm v1.25.12
 )
 
+require github.com/neo4j/neo4j-go-driver/v5 v5.28.0
+
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
