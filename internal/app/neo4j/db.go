@@ -9,6 +9,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+type QueryBuilder struct {
+	createClause []string
+	matchClause []string
+	with string
+	optionalMatch []string
+	returnClause string
+	params map[string]interface{}
+}
+
 func NewDriver() (neo4j.DriverWithContext, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -32,30 +41,66 @@ func NewDriver() (neo4j.DriverWithContext, error) {
 	return driver, nil
 }
 
-func CreateAndReturnNode(ctx context.Context, driver neo4j.DriverWithContext, label string, properties map[string]interface{}) (map[string]interface{}, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close(ctx)
 
-	result, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (interface{}, error) {
-					query := fmt.Sprintf("CREATE (n:%s $props) RETURN n", label)
-					res, err := tx.Run(ctx, query, map[string]interface{}{"props": properties})
-					if err != nil {
-									return nil, err
-					}
+func NewQueryBuilder(queryType string) (*QueryBuilder, error) {
+	if queryType != "create" && queryType != "match" {
+		return nil, fmt.Errorf("invalid query type, must be 'create' or 'match'")
+	}
+	return &QueryBuilder{
+		params:    make(map[string]interface{}),
+	}, nil
+}
 
-					if res.Next(ctx) {
-									record := res.Record()
-									node := record.Values[0].(neo4j.Node)
-									return node.Props, nil
-					}
+func (qb *QueryBuilder) With(param string) *QueryBuilder {
+	qb.with = param
+	return qb
+}
 
-					return nil, fmt.Errorf("node creation failed")
-	})
 
-	if err != nil {
-					return nil, err
+func (qb *QueryBuilder) Match(clause string) *QueryBuilder {
+	
+	qb.matchClause = append(qb.matchClause, clause)
+	return qb
+}
+
+func (qb *QueryBuilder) Create(clause string) *QueryBuilder {
+	qb.createClause = append(qb.createClause, clause)
+	return qb
+}
+
+func (qb *QueryBuilder) OptionalMatch(clause string) *QueryBuilder {
+	qb.optionalMatch = append(qb.optionalMatch, clause)
+	return qb
+}
+
+func (qb *QueryBuilder) Return(returnClause string) *QueryBuilder {
+	qb.returnClause = returnClause
+	return qb
+}
+
+func (qb *QueryBuilder) WithParam(key string, value interface{}) *QueryBuilder {
+	qb.params[key] = value
+	return qb
+}
+
+func (qb *QueryBuilder) Build() (string, map[string]interface{}) {
+	var query string
+	for _, clause := range qb.matchClause {
+		query += fmt.Sprintf("\nMATCH %s", clause)
+	}
+	if qb.with != "" {
+		query += fmt.Sprintf("\nWITH %s", qb.with)
+	}
+	for _, clause := range qb.createClause {
+		query += fmt.Sprintf("\nCREATE %s", clause)
 	}
 
-	return result.(map[string]interface{}), nil
+
+	for _, clause := range qb.optionalMatch {
+		query += fmt.Sprintf("\nOPTIONAL MATCH %s", clause)
+	}
+	query += fmt.Sprintf("\nRETURN %s", qb.returnClause)
+	return query, qb.params
 }
+
 
