@@ -2,7 +2,12 @@ package routing
 
 import (
 	"fmt"
+	stdlog "log"
 	"net/http"
+	"os"
+
+	admissioncontrol "github.com/elithrar/admission-control"
+	log "github.com/go-kit/log"
 )
 
 type Middleware func(http.ResponseWriter, *http.Request)
@@ -77,8 +82,20 @@ func (r *Router) Handle(method string, path string, handler HTTPHandlerWithConte
 }
 
 func (r *Router) Serve(port string, options ServeOptions) error {
+	var logger log.Logger
+	
+	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
+	stdlog.SetOutput(log.NewStdlibAdapter(logger))
+
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "loc", log.DefaultCaller)
+
+	loggingMiddleware := admissioncontrol.LoggingMiddleware(logger)
+	
 	fmt.Println("Server started on port", port)
 	fmt.Println("Message:", options.Message)
-	http.ListenAndServe(":"+port, r.mux)
+	if err := http.ListenAndServe(":"+port, loggingMiddleware(r.mux)); err != nil {
+		logger.Log("status", "fatal", "err", err)
+    os.Exit(1)
+	}
 	return nil
 }
