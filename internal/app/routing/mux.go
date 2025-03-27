@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -102,7 +101,6 @@ func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							}
 			}
 			if match {
-				fmt.Println("Matched route", routePath)
 				pathParams := m.getPathParams(r.URL.Path, routePath)
 				queryParams := m.getQueryParams(r.URL.RawQuery)
 				

@@ -7,6 +7,9 @@ import (
 )
 
 func main() {
+
+
+	
 	router := routing.NewRouter()
 	router.Use(middleware.Cors)
 	router.Use(middleware.ContentTypeJSON)
