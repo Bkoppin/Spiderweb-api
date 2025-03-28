@@ -5,118 +5,110 @@ import (
 	"strings"
 )
 
-
 type HTTPHandlerWithContext func(w http.ResponseWriter, r *http.Request, c Context)
 
 type Mux struct {
-	routes map[string]map[string]HTTPHandlerWithContext
-	RouterMiddleware []Middleware
-	RouteMiddleware map[string][]Middleware
+        routes           map[string]map[string]HTTPHandlerWithContext
+        RouterMiddleware []Middleware
+        RouteMiddleware  map[string][]Middleware
 }
-
 
 func newMux() *Mux {
-	return &Mux{
-		routes: make(map[string]map[string]HTTPHandlerWithContext),
-		RouterMiddleware: make([]Middleware, 0),
-		RouteMiddleware: make(map[string][]Middleware),
-	}
+        return &Mux{
+                routes:           make(map[string]map[string]HTTPHandlerWithContext),
+                RouterMiddleware: make([]Middleware, 0),
+                RouteMiddleware:  make(map[string][]Middleware),
+        }
 }
-
 
 func (m *Mux) handle(method string, path string, handler HTTPHandlerWithContext, middleware ...Middleware) {
-	if _, ok := m.routes[method]; !ok {
-		m.routes[method] = make(map[string]HTTPHandlerWithContext)
-	}
+        if _, ok := m.routes[method]; !ok {
+                m.routes[method] = make(map[string]HTTPHandlerWithContext)
+        }
 
-	if _, ok := m.RouteMiddleware[path]; !ok {
-		m.RouteMiddleware[path] = make([]Middleware, 0)
-	}
+        if _, ok := m.RouteMiddleware[path]; !ok {
+                m.RouteMiddleware[path] = make([]Middleware, 0)
+        }
 
-	if (middleware != nil) {
-	m.RouteMiddleware[path] = append(m.RouteMiddleware[path], middleware...)
-	}
-	m.routes[method][path] = handler
-}
-
-func (m *Mux) getPathParams(path string, route string) map[string]string {
-	pathParams := make(map[string]string)
-	pathParts := strings.Split(path, "/")
-	routeParts := strings.Split(route, "/")
-	if len(pathParts) == len(routeParts) {
-	for i, part := range routeParts {
-		if strings.HasPrefix(part, ":") {
-			pathParams[part[1:]] = pathParts[i]
-		}
-	}
-	}
-	
-	return pathParams
+        if middleware != nil {
+                m.RouteMiddleware[path] = append(m.RouteMiddleware[path], middleware...)
+        }
+        m.routes[method][path] = handler
 }
 
 func (m *Mux) getQueryParams(query string) map[string]string {
-	if query == "" {
-		return nil
-	}
+        if query == "" {
+                return nil
+        }
 
-	queryParams := make(map[string]string)
-	queryParts := strings.Split(query, "&")
+        queryParams := make(map[string]string)
+        queryParts := strings.Split(query, "&")
 
-
-
-	for _, part := range queryParts {
-		parts := strings.Split(part, "=")
-		queryParams[parts[0]] = parts[1]
-	}
-	return queryParams
+        for _, part := range queryParts {
+                parts := strings.Split(part, "=")
+                queryParams[parts[0]] = parts[1]
+        }
+        return queryParams
 }
 
+func (m *Mux) matchRoute(r *http.Request, routes map[string]HTTPHandlerWithContext) (HTTPHandlerWithContext, *Context, string) {
+	if handler, ok := routes[r.URL.Path]; ok {
+					context := newContext()
+					return handler, &context, r.URL.Path
+	}
 
+	for routePath, handler := range routes {
+					if params, ok := m.matchPath(r.URL.Path, routePath); ok {
+									context := newContext()
+									context.setPathParams(params)
+									context.setQueryParams(m.getQueryParams(r.URL.RawQuery))
+									return handler, &context, routePath
+					}
+	}
+	return nil, nil, ""
+}
+
+func (m *Mux) matchPath(requestPath, routePath string) (map[string]string, bool) {
+	routeParts := strings.Split(routePath, "/")
+	requestParts := strings.Split(requestPath, "/")
+
+	if len(routeParts) != len(requestParts) {
+					return nil, false
+	}
+
+	params := make(map[string]string)
+	for i, part := range routeParts {
+					if strings.HasPrefix(part, ":") {
+									params[part[1:]] = requestParts[i]
+					} else if part != requestParts[i] {
+									return nil, false
+					}
+	}
+	return params, true
+}
 
 func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	for _, middleware := range m.RouterMiddleware {
-		middleware(w, r)
-	}
-	if routes, ok := m.routes[r.Method]; ok {
-		if handler, ok := routes[r.URL.Path]; ok {
-			context := newContext()
-			for _, middleware := range m.RouteMiddleware[r.URL.Path] {
-				middleware(w, r)
-			}
-			handler(w, r, context)
-			return
-		}
-	for routePath, handler := range routes {
-		routeParts := strings.Split(routePath, "/")
-		requestParts := strings.Split(r.URL.Path, "/")
-		if len(routeParts) == len(requestParts) {
-			match := true
-			params := make(map[string]string)
-			for i, part := range routeParts {
-							if strings.HasPrefix(part, ":") {
-											params[part[1:]] = requestParts[i]
-							} else if part != requestParts[i] {
-											match = false
-											break
-							}
-			}
-			if match {
-				pathParams := m.getPathParams(r.URL.Path, routePath)
-				queryParams := m.getQueryParams(r.URL.RawQuery)
-				
-				context := newContext()
-				context.setPathParams(pathParams)
-				context.setQueryParams(queryParams)
+        for _, middleware := range m.RouterMiddleware {
+                middleware(w, r)
+        }
 
-				for _, middleware := range m.RouteMiddleware[routePath] {
-					middleware(w, r)
-				}
-				handler(w, r, context)
-				return
-			}
-		}
-	}
-}
-	http.NotFound(w, r)
-}
+        routes, ok := m.routes[r.Method]
+        if !ok {
+                http.NotFound(w, r)
+                return
+        }
 
+        handler, context, matchedRoute := m.matchRoute(r, routes)
+        if handler == nil {
+                http.NotFound(w, r)
+                return
+        }
+
+        if middleware, ok := m.RouteMiddleware[matchedRoute]; ok {
+                for _, mw := range middleware {
+                        mw(w, r)
+                }
+        }
+
+        handler(w, r, *context)
+}
