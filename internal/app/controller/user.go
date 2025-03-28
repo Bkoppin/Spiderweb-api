@@ -31,18 +31,12 @@ func createNeoUser(user models.User) (error) {
 	}
 	defer tx.Rollback(ctx)
 
-	queryBuilder, err := neo.NewQueryBuilder("create")
-	if err != nil {
-		return err
-	}
-
-	query, params := queryBuilder.Match("(u:User {username: $username, userID: $userID})").
+	queryBuilder := neo.NewQueryBuilder()
+	query, params := queryBuilder.Create("(u:User {username: $username, userID: $userID})").
 		WithParam("username", user.Username).
 		WithParam("userID", user.ID).
 		Return("u").
 		Build()
-
-	fmt.Println(query)
 
 	_, err = tx.Run(ctx, query, params)
 	if err != nil {
@@ -74,10 +68,8 @@ func fetchUserWorlds(userID string) ([]models.World, error) {
 	}
 	defer tx.Rollback(ctx)
 
-	queryBuilder, err := neo.NewQueryBuilder("match")
-	if err != nil {
-		return nil, err
-	}
+	queryBuilder := neo.NewQueryBuilder()
+
 
 	parsedUserID, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
@@ -134,7 +126,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 		http.Error(w, res.Error.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(user)
+
 	err = createNeoUser(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -241,6 +233,4 @@ func Test(w http.ResponseWriter, r *http.Request, context routing.Context) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Hello, World!")
 }
-
-
 
