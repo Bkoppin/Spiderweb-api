@@ -165,6 +165,11 @@ func GetUser(w http.ResponseWriter, r *http.Request, context routing.Context) {
 			return
 		}
 
+		if _, err := strconv.ParseInt(id, 10, 64); err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
 		var user models.User
 		res := db.First(&user, id)
 		if res.Error != nil {
@@ -230,6 +235,11 @@ func Login(w http.ResponseWriter, r *http.Request, context routing.Context) {
 			"id":   dbUser.ID,
 		}
 		json.NewEncoder(w).Encode(data)
+}
+
+func Test(w http.ResponseWriter, r *http.Request, context routing.Context) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Hello, World!")
 }
 
 
