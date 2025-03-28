@@ -118,11 +118,7 @@ func CreateWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 		return
 	}
 
-	queryBuilder, err := neo.NewQueryBuilder("create")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	queryBuilder := neo.NewQueryBuilder()
 	
 	userIDInt, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
@@ -142,10 +138,6 @@ func CreateWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 		WithParam("userID", userIDInt).
 		Build()
 
-	
-	fmt.Println(query)
-	fmt.Println(params)
-
 	node, err := createWorld(query, params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -163,13 +155,7 @@ func GetWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 		return
 	}
 
-	fmt.Println(id)
-
-	queryBuilder, err := neo.NewQueryBuilder("match")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	queryBuilder := neo.NewQueryBuilder()
 
 	query, params := queryBuilder.
 		Match("(w) WHERE elementId(w) = $elementId").

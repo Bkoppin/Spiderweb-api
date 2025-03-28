@@ -10,10 +10,7 @@ import (
 )
 
 type QueryBuilder struct {
-	createClause []string
-	matchClause []string
-	with string
-	optionalMatch []string
+	query string
 	returnClause string
 	params map[string]interface{}
 }
@@ -42,34 +39,32 @@ func NewDriver() (neo4j.DriverWithContext, error) {
 }
 
 
-func NewQueryBuilder(queryType string) (*QueryBuilder, error) {
-	if queryType != "create" && queryType != "match" {
-		return nil, fmt.Errorf("invalid query type, must be 'create' or 'match'")
-	}
+func NewQueryBuilder() (*QueryBuilder) {
 	return &QueryBuilder{
 		params:    make(map[string]interface{}),
-	}, nil
+		
+	}
 }
 
 func (qb *QueryBuilder) With(param string) *QueryBuilder {
-	qb.with = param
+	qb.query += fmt.Sprintf("\nWITH %s", param)
 	return qb
 }
 
 
 func (qb *QueryBuilder) Match(clause string) *QueryBuilder {
 	
-	qb.matchClause = append(qb.matchClause, clause)
+	qb.query += fmt.Sprintf("\nMATCH %s", clause)
 	return qb
 }
 
 func (qb *QueryBuilder) Create(clause string) *QueryBuilder {
-	qb.createClause = append(qb.createClause, clause)
+	qb.query += fmt.Sprintf("\nCREATE %s", clause)
 	return qb
 }
 
 func (qb *QueryBuilder) OptionalMatch(clause string) *QueryBuilder {
-	qb.optionalMatch = append(qb.optionalMatch, clause)
+	qb.query += fmt.Sprintf("\nOPTIONAL MATCH %s", clause)
 	return qb
 }
 
@@ -85,20 +80,7 @@ func (qb *QueryBuilder) WithParam(key string, value interface{}) *QueryBuilder {
 
 func (qb *QueryBuilder) Build() (string, map[string]interface{}) {
 	var query string
-	for _, clause := range qb.matchClause {
-		query += fmt.Sprintf("\nMATCH %s", clause)
-	}
-	if qb.with != "" {
-		query += fmt.Sprintf("\nWITH %s", qb.with)
-	}
-	for _, clause := range qb.createClause {
-		query += fmt.Sprintf("\nCREATE %s", clause)
-	}
-
-
-	for _, clause := range qb.optionalMatch {
-		query += fmt.Sprintf("\nOPTIONAL MATCH %s", clause)
-	}
+	query += qb.query
 	query += fmt.Sprintf("\nRETURN %s", qb.returnClause)
 	return query, qb.params
 }
