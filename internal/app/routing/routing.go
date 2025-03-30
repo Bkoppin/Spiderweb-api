@@ -7,7 +7,7 @@ import (
 	"os"
 
 	admissioncontrol "github.com/elithrar/admission-control"
-	log "github.com/go-kit/log"
+	"github.com/go-kit/log"
 )
 
 type Middleware func(http.ResponseWriter, *http.Request)

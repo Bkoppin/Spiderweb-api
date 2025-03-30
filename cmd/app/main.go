@@ -15,7 +15,7 @@ func main() {
 	router.Handle("GET", "/api/users/:id/worlds", controller.GetUserWorlds)
 	router.Handle("POST", "/api/users/:id/worlds", controller.CreateWorld)
 	router.Handle("GET", "/api/worlds/:id", controller.GetWorld)
-	router.Handle("GET", "/api/users/zones", controller.Test)
+	router.Handle("POST", "/api/worlds/:id/continents", controller.CreateContinent)
 	router.Serve("8080", routing.ServeOptions{Message: "http://localhost:8080",})
 
 }

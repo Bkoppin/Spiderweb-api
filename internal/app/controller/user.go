@@ -51,7 +51,7 @@ func createNeoUser(user models.User) (error) {
 	return nil
 }
 
-func fetchUserWorlds(userID string) ([]models.World, error) {
+func fetchUserWorlds(userID string) (neo.Node, error) {
 	ctx := context.Background()
 	driver, err := neo.NewDriver()
 	if err != nil {
@@ -60,52 +60,50 @@ func fetchUserWorlds(userID string) ([]models.World, error) {
 	defer driver.Close(ctx)
 
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+
 	defer session.Close(ctx)
 
-	tx, err := session.BeginTransaction(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
-
-	queryBuilder := neo.NewQueryBuilder()
-
-
-	parsedUserID, err := strconv.ParseInt(userID, 10, 64)
+	parsedUserID, err := strconv.Atoi(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	query, params := queryBuilder.Match("(u:User {userID: $userID})").
-		WithParam("userID", parsedUserID).
-		Match("(u)-[:OWNS]->(w:World)").
-		Return("w").
-		Build()
+	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (interface{}, error) {
+		
+		queryBuilder := neo.NewQueryBuilder()
+		query, params := queryBuilder.Match("(u:User {userID: $userID})").
+			WithParam("userID", parsedUserID).
+			OptionalMatch("(u)-[:OWNS]->(w:World)").
+			OptionalMatch("(w)-[:HAS]->(c:Continent)").
+			OptionalMatch("(w)-[:HAS]->(o:Ocean)").
+			OptionalMatch("(w)-[:HAS]->(z:Zone)").
+			OptionalMatch("(z)-[:HAS]->(l:Location)").
+			OptionalMatch("(z)-[:HAS]->(ci:City)").
+			Return("u, w, c, o, z, l, ci").
+			Build()
 
-	res, err := tx.Run(ctx, query, params)
-	if err != nil {
-		return nil, err
-	}
-
-	var worlds []models.World
-	for res.Next(ctx) {
-		record := res.Record()
-		worldValue, ok := record.Get("w")
-		if !ok {
-			return nil, fmt.Errorf("failed to retrieve 'w' from record")
+		records, err := tx.Run(ctx, query, params)
+		if err != nil {
+						return nil, err
 		}
-		worldNode := worldValue.(neo4j.Node)
-
-		world := models.World{
-			ID:          worldNode.ElementId,
-			Name:        worldNode.Props["name"].(string),
-			Type:        worldNode.Props["type"].(string),
-			Description: worldNode.Props["description"].(string),
+		recordList := []neo4j.Record{}
+		for records.Next(ctx) {
+						recordList = append(recordList, *records.Record())
 		}
-		worlds = append(worlds, world)
-	}
+		return recordList, nil
+	})
 
-	return worlds, nil
+	if err != nil {
+		return nil, err
+	}
+	records, ok := result.([]neo4j.Record)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert result to []neo4j.Record")
+	}
+	return neo.BuildNodeTree(records), nil
+
+
+	
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request, context routing.Context) {
@@ -189,9 +187,11 @@ func GetUserWorlds(w http.ResponseWriter, r *http.Request, context routing.Conte
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		
+		data := worlds.BuildTree()
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(worlds)
+		json.NewEncoder(w).Encode(data)
 }
 
 
