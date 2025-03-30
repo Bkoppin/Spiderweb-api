@@ -2,7 +2,7 @@ package models
 
 type NeoUser struct {
 	Username string  `json:"username"`
-	UserID   string  `json:"userID"`
+	UserID   int64  `json:"userID"`
 	Worlds   []World `json:"worlds"`
 }
 
@@ -17,6 +17,7 @@ type World struct {
 
 type Continent struct {
 	Name        string `json:"name"`
+	ID          string `json:"id"`
 	Description string `json:"description"`
 	Type        string `json:"type"`
 	Zones       []Zone `json:"zones"`
