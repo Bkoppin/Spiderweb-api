@@ -1,3 +1,20 @@
+/*
+package neo is a package that provides an interface to interact with a Neo4j database.
+
+It includes a QueryBuilder for constructing Cypher queries, a Node interface for representing
+nodes in the graph, and a BaseNode struct that implements the Node interface.
+It also provides functions to create a Neo4j driver, build a node tree from query results,
+and establish relationships between nodes.
+The package uses the Neo4j Go driver to connect to the database and execute queries.
+
+@exported:
+  - @func NewQueryBuilder: creates a new QueryBuilder instance.
+  - @func NewDriver: creates a new Neo4j driver instance.
+  - @func BuildNodeTree: builds a tree of nodes from query results.
+  - @interface Node: defines methods for interacting with nodes in the graph.
+  - @struct BaseNode: implements the Node interface and provides methods for managing node properties and relationships.
+  - @struct QueryBuilder: provides methods for constructing Cypher queries.
+*/
 package neo
 
 import (
@@ -11,48 +28,124 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+/*
+type QueryBuilder: A struct that provides methods for constructing Cypher queries.
+	- @property query: The Cypher query string.
+	- @property returnClause: The RETURN clause of the Cypher query.
+	- @property params: A map of parameters to be used in the Cypher query.
+	- @method With: Adds a WITH clause to the query.
+	- @method Match: Adds a MATCH clause to the query.
+	- @method Create: Adds a CREATE clause to the query.
+	- @method OptionalMatch: Adds an OPTIONAL MATCH clause to the query.
+	- @method Return: Sets the RETURN clause of the query.
+	- @method WithParam: Adds a parameter to the query.
+	- @method Build: Builds the final Cypher query string and returns it along with the parameters.
+*/
 type QueryBuilder struct {
 	query        string
 	returnClause string
 	params       map[string]interface{}
 }
 
+/* 
+func NewQueryBuilder: Creates a new QueryBuilder instance.
+	- @returns: A pointer to a new QueryBuilder instance.
+@example:
+	qb := NewQueryBuilder()
+	query, params := qb.Create("(u:User {username: $username})").
+		With("u").
+		Match("((u)-[:OWNS]->(w:World)).
+		WithParam("username", "JohnDoe").
+		Return("u, w").
+		Build()
+	fmt.Println(query) // Prints the constructed Cypher query
+	fmt.Println(params) // Prints the parameters used in the query
+*/
 func NewQueryBuilder() *QueryBuilder {
 	return &QueryBuilder{
 		params: make(map[string]interface{}),
 	}
 }
 
+/*
+ @method With: Adds a WITH clause to the query.
+
+ @param param: The WITH clause to be added.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) With(param string) *QueryBuilder {
 	qb.query += fmt.Sprintf("\nWITH %s", param)
 	return qb
 }
 
+/*
+ @method Match: Adds a MATCH clause to the query.
+
+ @param clause: The MATCH clause to be added.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) Match(clause string) *QueryBuilder {
 	qb.query += fmt.Sprintf("\nMATCH %s", clause)
 	return qb
 }
 
+/*
+ @method Create: Adds a CREATE clause to the query.
+
+ @param clause: The CREATE clause to be added.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) Create(clause string) *QueryBuilder {
 	qb.query += fmt.Sprintf("\nCREATE %s", clause)
 	return qb
 }
 
+/*
+ @method OptionalMatch: Adds an OPTIONAL MATCH clause to the query.
+
+ @param clause: The OPTIONAL MATCH clause to be added.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) OptionalMatch(clause string) *QueryBuilder {
 	qb.query += fmt.Sprintf("\nOPTIONAL MATCH %s", clause)
 	return qb
 }
 
+/*
+ @method Return: Sets the RETURN clause of the query.
+
+ @param returnClause: The RETURN clause to be set.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) Return(returnClause string) *QueryBuilder {
 	qb.returnClause = returnClause
 	return qb
 }
 
+/*
+ @method WithParam: Adds a parameter to the query.
+
+ @param key: The key of the parameter.
+
+ @param value: The value of the parameter.
+
+ @returns: A pointer to the QueryBuilder instance.
+*/
 func (qb *QueryBuilder) WithParam(key string, value interface{}) *QueryBuilder {
 	qb.params[key] = value
 	return qb
 }
 
+/*
+ @method Build: Builds the final Cypher query string and returns it along with the parameters.
+
+ @returns: The constructed Cypher query string and a map of parameters.
+*/
 func (qb *QueryBuilder) Build() (string, map[string]interface{}) {
 	var query string
 	query += qb.query
@@ -60,6 +153,18 @@ func (qb *QueryBuilder) Build() (string, map[string]interface{}) {
 	return query, qb.params
 }
 
+/*
+
+@interface Node: Defines methods for interacting with nodes in the graph.
+	- @method AddChild: Adds a child node to the current node.
+	- @method GetChildren: Returns the child nodes of the current node.
+	- @method SetProps: Sets the properties of the current node.
+	- @method GetProps: Returns the properties of the current node.
+	- @method GetLabel: Returns the label of the current node.
+	- @method MarshalJSON: Marshals the current node to JSON format.
+	- @method @private buildObject: Builds an object representation of the current node.
+	- @method BuildTree: Builds a tree structure from the current node and its children.
+*/
 type Node interface {
 	AddChild(child Node)
 	GetChildren() []Node
@@ -68,9 +173,33 @@ type Node interface {
 	GetLabel() string
 	MarshalJSON() ([]byte, error)
 	buildObject() interface{}
+/*
+@method BuildTree: Builds a tree structure from the current node and its children.
+	- @returns: An interface{} representing the root of the tree.
+
+@note: The tree structure is built based on the relationships between nodes, currently only node models in package models are supported.
+
+@example:
+	node, err := BuildNodeTree(records)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tree := node.BuildTree()
+	fmt.Println(tree) // Prints the tree structure
+
+@returns: An interface{} representing the root of the tree.
+*/
 	BuildTree() interface{}
 }
 
+/*
+@struct BaseNode: Implements the Node interface and provides methods for managing node properties and relationships.
+
+	- @property Label: The label of the node.
+	- @property Name: The name of the node.
+	- @property Props: A map of properties associated with the node.
+	- @property Children: A slice of child nodes.
+*/	
 type BaseNode struct {
 	Label    string
 	Name     string
@@ -78,14 +207,26 @@ type BaseNode struct {
 	Children []Node
 }
 
+/*
+@method AddChild: Adds a child node to the current node.
+	- @param child: The child node to be added.
+*/
 func (n *BaseNode) AddChild(child Node) {
 	n.Children = append(n.Children, child)
 }
 
+/*
+@method GetChildren: Returns the child nodes of the current node.
+	- @returns: A slice of child nodes.
+*/
 func (n *BaseNode) GetChildren() []Node {
 	return n.Children
 }
 
+/*
+@method SetProps: Sets the properties of the current node.
+	- @param props: A map of properties to be set.
+*/
 func (n *BaseNode) SetProps(props map[string]interface{}) {
 	n.Props = props
 	if name, ok := props["name"].(string); ok {
@@ -93,14 +234,26 @@ func (n *BaseNode) SetProps(props map[string]interface{}) {
 	}
 }
 
+/*
+@method GetProps: Returns the properties of the current node.
+	- @returns: A map of properties associated with the node.
+*/
 func (n *BaseNode) GetProps() map[string]interface{} {
 	return n.Props
 }
 
+/*
+@method GetLabel: Returns the label of the current node.
+	- @returns: The label of the node.
+*/
 func (n *BaseNode) GetLabel() string {
 	return n.Label
 }
 
+/*
+@method MarshalJSON: Marshals the current node to JSON format.
+	- @returns: A byte slice containing the JSON representation of the node and an error if any.
+*/
 func (n *BaseNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"label": n.Label,
@@ -110,6 +263,10 @@ func (n *BaseNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(props)
 }
 
+/*
+@method @private buildObject: Builds an object representation of the current node.
+	- @returns: An interface{} representing the object.
+*/
 func (n *BaseNode) buildObject() interface{} {
 	if n.Label == "" {
 		return nil
@@ -169,6 +326,22 @@ func (n *BaseNode) buildObject() interface{} {
 	return nil
 }
 
+/*
+@method BuildTree: Builds a tree structure from the current node and its children.
+	- @returns: An interface{} representing the root of the tree.
+
+@note: The tree structure is built based on the relationships between nodes, currently only node models in package models are supported.
+
+@example:
+	node, err := BuildNodeTree(records)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tree := node.BuildTree()
+	fmt.Println(tree) // Prints the tree structure
+
+@returns: An interface{} representing the root of the tree.
+*/
 func (n *BaseNode) BuildTree() interface{} {
 	root := n.buildObject()
 	if root == nil {
@@ -236,6 +409,36 @@ func newBaseNode(label string) *BaseNode {
 	}
 }
 
+/*
+@func NewDriver: Creates a new Neo4j driver instance.
+	- @returns: A pointer to a Neo4j driver instance and an error if any.
+	- @note: The driver is created using the URI, username, and password from environment variables.
+@example:
+		driver, err := NewDriver()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer driver.Close(ctx)
+		session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		defer session.Close(ctx)
+		res, err := session.Run(ctx, "MATCH (n) RETURN n", nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for res.Next(ctx) {
+			record := res.Record()
+			node, ok := record.Get("n")
+			if !ok {
+				log.Fatal("Failed to retrieve node from record")
+			}
+			fmt.Println(node)
+		}
+		if err = res.Err(); err != nil {
+			log.Fatal(err)
+		}
+@note: The driver is verified for connectivity after creation.
+@returns: A pointer to a Neo4j driver instance and an error if any.
+*/
 func NewDriver() (neo4j.DriverWithContext, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -259,6 +462,27 @@ func NewDriver() (neo4j.DriverWithContext, error) {
 	return driver, nil
 }
 
+/*
+@func BuildNodeTree: Builds a tree of nodes from query results.
+	- @param records: A slice of neo4j.Record representing the query results.
+	- @returns: A pointer to the root node of the tree.
+	- @note: The tree structure is built based on the relationships between nodes.
+@example:
+	records, err := session.Run(ctx, query, params)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var recordList []neo4j.Record
+	for records.Next(ctx) {
+		recordList = append(recordList, *records.Record())
+	}
+	root := BuildNodeTree(recordList)
+	if root == nil {
+		log.Fatal("Failed to build node tree")
+	}
+	// Use the root node as needed
+
+*/
 func BuildNodeTree(records []neo4j.Record) *BaseNode {
 	nodeMap := make(map[string]*BaseNode)
 	var root *BaseNode
