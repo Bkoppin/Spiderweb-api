@@ -1,3 +1,26 @@
+// Package routing is a lightweight HTTP router that allows for middleware chaining and context management.
+//
+// Included public types and functions:
+//
+//   - @package routing
+//
+//   - @type Middleware - A function that takes an http.ResponseWriter and an http.Request and returns nothing.
+//
+//   - @type Context - A struct that holds path and query parameters.
+//
+//   - @type ServeOptions - A struct that holds options for serving the router.
+//
+//   - @type Router - A struct that holds middleware and a Mux instance.
+//
+//   - @type Route - A struct that holds HTTP method, path, handler, and middleware for a specific route.
+//
+//   - @type HTTPHandlerWithContext - A function that takes an http.ResponseWriter, an http.Request, and a Context and returns nothing.
+//
+//   - @func Use - Adds a middleware to the Router's middleware chain.
+//
+//   - @func Handle - Registers a route with the specified method, path, handler, and middleware.
+//
+//   - @func Serve - Starts the HTTP server on the specified port with the provided options.
 package routing
 
 import (
@@ -10,13 +33,36 @@ import (
 	"github.com/go-kit/log"
 )
 
+/*
+type Middleware: A function that takes an http.ResponseWriter and an http.Request and returns nothing.
+
+This type is used to define middleware functions that can be applied to HTTP routes.
+*/
 type Middleware func(http.ResponseWriter, *http.Request)
 
+/*
+type Context: A struct that holds path and query parameters.
+
+This struct is used to manage the context of an HTTP request, including path parameters and query parameters.
+
+	- @property PathParams: A map of path parameters, where the key is the parameter name and the value is the parameter value.
+	- @property QueryParams: A map of query parameters, where the key is the parameter name and the value is the parameter value.
+	- @method @private setPathParams: Sets the path parameters for the context. 
+	- @method @private setQueryParams: Sets the query parameters for the context.
+	- @method GetPathParam: Returns the value of a path parameter by its key.
+	- @method GetQueryParam: Returns the value of a query parameter by its key.
+	- @constructor @private newContext: Creates a new Context instance with empty path and query parameters.
+	*/
 type Context struct {
 	PathParams map[string]string
 	QueryParams map[string]string
 }
 
+/*
+type ServeOptions: A struct that holds options for serving the router.
+This struct is used to configure the HTTP server when it is started.
+	- @property Message: A message to be displayed when the server starts.
+*/
 type ServeOptions struct {
 	Message string
 }
@@ -25,6 +71,14 @@ type Router struct {
 	mux *Mux
 }
 
+/*
+type Route: A struct that holds HTTP method, path, handler, and middleware for a specific route.
+This struct is used to define a route in the router.
+	- @property Method: The HTTP method for the route (e.g., GET, POST).
+	- @property Path: The path for the route (e.g., /api/v1/resource).
+	- @property Handler: The handler function for the route, which takes an http.ResponseWriter, an http.Request, and a Context.
+	- @property Middleware: A slice of middleware functions to be applied to the route.
+*/
 type Route struct {
 	Method string
 	Path string
@@ -32,6 +86,11 @@ type Route struct {
 	Middleware []Middleware
 }
 
+/*
+func newContext: Creates a new Context instance with empty path and query parameters.
+This function initializes a new Context struct with empty maps for path and query parameters.
+	- @return: A new Context instance.
+*/
 func newContext() Context {
 	return Context{
 		PathParams: make(map[string]string),
@@ -39,36 +98,76 @@ func newContext() Context {
 	}
 }
 
+/*
+func (c *Context) setPathParams: Sets the path parameters for the context.
+This method updates the PathParams map in the Context struct with the provided parameter map.
+	- @param paramMap: A map of path parameters, where the key is the parameter name and the value is the parameter value.
+*/
 func (c *Context) setPathParams(paramMap map[string]string) {
 	c.PathParams = paramMap
 }
 
+/*
+func (c *Context) setQueryParams: Sets the query parameters for the context.
+This method updates the QueryParams map in the Context struct with the provided parameter map.
+	- @param paramMap: A map of query parameters, where the key is the parameter name and the value is the parameter value.
+*/
 func (c *Context) setQueryParams(paramMap map[string]string) {
 	c.QueryParams = paramMap
 }
 
+/*
+func (c Context) GetPathParam: Returns the value of a path parameter by its key.
+This method retrieves the value of a path parameter from the PathParams map in the Context struct.
+	- @param key: The key of the path parameter to retrieve.
+	- @return: The value of the specified path parameter.
+*/
 func (c Context) GetPathParam(key string) string {
 	return c.PathParams[key]
 }
 
+/*
+func (c Context) GetQueryParam: Returns the value of a query parameter by its key.
+This method retrieves the value of a query parameter from the QueryParams map in the Context struct.
+	- @param key: The key of the query parameter to retrieve.
+	- @return: The value of the specified query parameter.
+*/
 func (c Context) GetQueryParam(key string) string {
 	return c.QueryParams[key]
 }
 
+/*
+func NewRouter: Creates a new Router instance with an empty middleware chain and a new Mux instance.
+This function initializes a Router struct with an empty slice of middleware and a new Mux instance.
+	- @return: A new Router instance.
+*/
 func NewRouter() *Router {
-	
-
 	return &Router{
 		middleware: make([]Middleware, 0),
 		mux: newMux(),
 	}
 }
 
+// Use adds a middleware to the Router's middleware chain and updates the
+// Router's internal mux with the new middleware list.
+//
+// Parameters:
+//   - m: The middleware to be added to the Router's middleware chain.
 func (r *Router) Use(m Middleware) {
 	r.middleware = append(r.middleware, m)
 	r.mux.RouterMiddleware = r.middleware
 }
 
+
+/*
+func (r *Router) Handle: Registers a route with the specified method, path, handler, and middleware.
+This method adds a new route to the Router's internal mux and returns a Route instance.
+	- @param method: The HTTP method for the route (e.g., GET, POST).
+	- @param path: The path for the route (e.g., /api/v1/resource).
+	- @param handler: The handler function for the route, which takes an http.ResponseWriter, an http.Request, and a Context.
+	- @param middleware: A variadic list of middleware functions to be applied to the route.
+	- @return: A Route instance representing the registered route.
+*/
 func (r *Router) Handle(method string, path string, handler HTTPHandlerWithContext, middleware ...Middleware) *Route {
 	route := Route{
 		Method: method,
@@ -81,6 +180,13 @@ func (r *Router) Handle(method string, path string, handler HTTPHandlerWithConte
 	return &route
 }
 
+/*
+func (r *Router) Serve: Starts the HTTP server on the specified port with the provided options.
+This method initializes the server with the specified port and options, and starts listening for incoming HTTP requests.
+	- @param port: The port on which the server will listen for incoming requests.
+	- @param options: A ServeOptions instance containing options for serving the router.
+	- @return: An error if the server fails to start.
+*/
 func (r *Router) Serve(port string, options ServeOptions) error {
 	var logger log.Logger
 	
