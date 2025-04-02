@@ -24,10 +24,11 @@ func main() {
 	router.Handle("POST", "/api/users", controller.CreateUser)
 	router.Handle("GET", "/api/users/:id", controller.GetUser)
 	router.Handle("GET", "/api/users/:id/worlds", controller.GetUserWorlds)
+	router.Handle("GET", "/api/users/:id/neo", controller.GetNeoUser)
 	router.Handle("POST", "/api/users/:id/worlds", controller.CreateWorld)
 	router.Handle("GET", "/api/worlds/:id", controller.GetWorld)
 	router.Handle("POST", "/api/worlds/:id/continents", controller.CreateContinent)
-	router.Serve("8080", routing.ServeOptions{Message: "http://localhost:8080", Logging: true})
+	router.Serve("8080", routing.ServeOptions{Message: "http://localhost:8080"})
 
 }
 
