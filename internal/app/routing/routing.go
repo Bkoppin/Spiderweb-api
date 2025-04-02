@@ -65,6 +65,7 @@ This struct is used to configure the HTTP server when it is started.
 */
 type ServeOptions struct {
 	Message string
+	Logging bool
 }
 type Router struct {
 	middleware []Middleware
@@ -188,6 +189,7 @@ This method initializes the server with the specified port and options, and star
 	- @return: An error if the server fails to start.
 */
 func (r *Router) Serve(port string, options ServeOptions) error {
+	if options.Logging {
 	var logger log.Logger
 	
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
@@ -203,5 +205,9 @@ func (r *Router) Serve(port string, options ServeOptions) error {
 		logger.Log("status", "fatal", "err", err)
     os.Exit(1)
 	}
+	}
+	fmt.Println("Server started on port", port)
+	fmt.Println("Message:", options.Message)
+	http.ListenAndServe(":"+port, r.mux)
 	return nil
 }

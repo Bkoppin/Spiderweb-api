@@ -18,11 +18,12 @@ The package uses the Neo4j Go driver to connect to the database and execute quer
 package neo
 
 import (
-	"api/internal/app/models"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -162,8 +163,6 @@ func (qb *QueryBuilder) Build() (string, map[string]interface{}) {
 	- @method GetProps: Returns the properties of the current node.
 	- @method GetLabel: Returns the label of the current node.
 	- @method MarshalJSON: Marshals the current node to JSON format.
-	- @method @private buildObject: Builds an object representation of the current node.
-	- @method BuildTree: Builds a tree structure from the current node and its children.
 */
 type Node interface {
 	AddChild(child Node)
@@ -172,24 +171,6 @@ type Node interface {
 	GetProps() map[string]interface{}
 	GetLabel() string
 	MarshalJSON() ([]byte, error)
-	buildObject() interface{}
-/*
-@method BuildTree: Builds a tree structure from the current node and its children.
-	- @returns: An interface{} representing the root of the tree.
-
-@note: The tree structure is built based on the relationships between nodes, currently only node models in package models are supported.
-
-@example:
-	node, err := BuildNodeTree(records)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tree := node.BuildTree()
-	fmt.Println(tree) // Prints the tree structure
-
-@returns: An interface{} representing the root of the tree.
-*/
-	BuildTree() interface{}
 }
 
 /*
@@ -264,142 +245,34 @@ func (n *BaseNode) MarshalJSON() ([]byte, error) {
 }
 
 /*
-@method @private buildObject: Builds an object representation of the current node.
-	- @returns: An interface{} representing the object.
-*/
-func (n *BaseNode) buildObject() interface{} {
-	if n.Label == "" {
-		return nil
-	}
+@private func buildTree maps the current BaseNode and its children to a strongly-typed model.
 
-	if n.Label == "User" {
-		return &models.NeoUser{
-			Username: n.Props["username"].(string),
-			UserID:   n.Props["userID"].(int64),
-			Worlds:   []models.World{},
-		}
-	} else if n.Label == "World" {
-		return &models.World{
-			Name:        n.Props["name"].(string),
-			ID:          n.Props["id"].(string),
-			Type:        n.Props["type"].(string),
-			Description: n.Props["description"].(string),
-			Continents:  []models.Continent{},
-			Oceans:      []models.Ocean{},
-		}
-	} else if n.Label == "Continent" {
-		return &models.Continent{
-			Name:        n.Props["name"].(string),
-			ID:          n.Props["id"].(string),
-			Description: n.Props["description"].(string),
-			Type:        n.Props["type"].(string),
-			Zones:       []models.Zone{},
-		}
-	} else if n.Label == "Ocean" {
-		return &models.Ocean{
-			Name:        n.Props["name"].(string),
-			Description: n.Props["description"].(string),
-		}
-	} else if n.Label == "Zone" {
-		return &models.Zone{
-			Name:        n.Props["name"].(string),
-			Type:        n.Props["type"].(string),
-			Description: n.Props["description"].(string),
-			Locations:   []models.Location{},
-			Cities:      []models.City{},
-			Biome:       n.Props["biome"].(string),
-		}
-	} else if n.Label == "Location" {
-		return &models.Location{
-			Name:        n.Props["name"].(string),
-			Type:        n.Props["type"].(string),
-			Description: n.Props["description"].(string),
-		}
-	} else if n.Label == "City" {
-		return &models.City{
-			Name:        n.Props["name"].(string),
-			Type:        n.Props["type"].(string),
-			Description: n.Props["description"].(string),
-			Capital:     n.Props["capital"].(bool),
-		}
-	}
-	return nil
-}
+This method uses reflection to dynamically map the properties and relationships
+of the BaseNode to the fields of the specified model type `T`. The method ensures
+type safety by returning an error if the mapping fails or if the type casting
+to `*T` is unsuccessful.
 
-/*
-@method BuildTree: Builds a tree structure from the current node and its children.
-	- @returns: An interface{} representing the root of the tree.
+@type T: The type of the model to which the BaseNode should be mapped.
 
-@note: The tree structure is built based on the relationships between nodes, currently only node models in package models are supported.
+@returns:
+  - (*T, error): A pointer to the mapped model of type `T` if successful, or an error
+    if the mapping or type casting fails.
 
 @example:
-	node, err := BuildNodeTree(records)
-	if err != nil {
-		log.Fatal(err)
-	}
-	tree := node.BuildTree()
-	fmt.Println(tree) // Prints the tree structure
-
-@returns: An interface{} representing the root of the tree.
+    // Assuming `root` is a *BaseNode representing a "World" node:
+    world, err := root.buildTree[models.World]()
+    if err != nil {
+        log.Fatalf("Failed to build tree: %v", err)
+    }
+    fmt.Printf("Mapped model: %+v\n", world)
 */
-func (n *BaseNode) BuildTree() interface{} {
-	root := n.buildObject()
-	if root == nil {
-		return nil
-	}
-
-	if len(n.Children) == 0 {
-		return root
-	}
-
-	switch node := root.(type) {
-	case *models.NeoUser:
-		for _, child := range n.Children {
-			childObj := child.BuildTree()
-			if childObj == nil {
-				continue
-			}
-			if world, ok := childObj.(*models.World); ok {
-				node.Worlds = append(node.Worlds, *world)
-			}
-		}
-	case *models.World:
-		for _, child := range n.Children {
-			childObj := child.BuildTree()
-			if childObj == nil {
-				continue
-			}
-			if continent, ok := childObj.(*models.Continent); ok {
-				node.Continents = append(node.Continents, *continent)
-			} else if ocean, ok := childObj.(*models.Ocean); ok {
-				node.Oceans = append(node.Oceans, *ocean)
-			}
-		}
-	case *models.Continent:
-		for _, child := range n.Children {
-			childObj := child.BuildTree()
-			if childObj == nil {
-				continue
-			}
-			if zone, ok := childObj.(*models.Zone); ok {
-				node.Zones = append(node.Zones, *zone)
-			}
-		}
-	case *models.Zone:
-		for _, child := range n.Children {
-			childObj := child.BuildTree()
-			if childObj == nil {
-				continue
-			}
-			if location, ok := childObj.(*models.Location); ok {
-				node.Locations = append(node.Locations, *location)
-			} else if city, ok := childObj.(*models.City); ok {
-				node.Cities = append(node.Cities, *city)
-			}
-		}
-	}
-
-	return root
+func buildTree[T any](n *BaseNode) (*T, error) {
+	model, ok := mapModels(n).(*T)
+	if !ok {
+		fmt.Printf("Failed to cast node with label '%s' to type '%T'\n", n.Label, model) // Debug log
+		return nil, fmt.Errorf("failed to cast node to the desired model type")
+}
+	return model, nil
 }
 
 func newBaseNode(label string) *BaseNode {
@@ -437,6 +310,7 @@ func newBaseNode(label string) *BaseNode {
 			log.Fatal(err)
 		}
 @note: The driver is verified for connectivity after creation.
+
 @returns: A pointer to a Neo4j driver instance and an error if any.
 */
 func NewDriver() (neo4j.DriverWithContext, error) {
@@ -463,54 +337,72 @@ func NewDriver() (neo4j.DriverWithContext, error) {
 }
 
 /*
-@func BuildNodeTree: Builds a tree of nodes from query results.
-	- @param records: A slice of neo4j.Record representing the query results.
-	- @returns: A pointer to the root node of the tree.
-	- @note: The tree structure is built based on the relationships between nodes.
+@func BuildNodeTree: Builds a tree of nodes from a slice of neo4j records returned from a query.
+	- @param records: A slice of neo4j records containing the nodes and their relationships.
+	- @returns: A pointer to the root node of the tree and an error if any.
+	- @note: The function populates a map with nodes, establishes relationships, and returns the root node.
+	- @note: The function uses a generic type `T` to return a strongly-typed model.
 @example:
-	records, err := session.Run(ctx, query, params)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var recordList []neo4j.Record
-	for records.Next(ctx) {
-		recordList = append(recordList, *records.Record())
-	}
-	root := BuildNodeTree(recordList)
-	if root == nil {
-		log.Fatal("Failed to build node tree")
-	}
-	// Use the root node as needed
+		records, err := session.Run(ctx, "MATCH (n) RETURN n", nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var recordList []neo4j.Record
+		for records.Next(ctx) {
+			recordList = append(recordList, *records.Record())
+		}
+		model, err := BuildNodeTree[models.World](recordList)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Mapped model: %+v\n", model)
 
 */
-func BuildNodeTree(records []neo4j.Record) *BaseNode {
+func BuildNodeTree[T any](records []neo4j.Record) ([]*T, error) {
 	nodeMap := make(map[string]*BaseNode)
-	var root *BaseNode
-	populateNodeMap(records, nodeMap, &root)
+
+	populateNodeMap(records, nodeMap)
 	establishRelationships(records, nodeMap)
-	return root
+
+	expectedLabel := getLabelForType[T]()
+
+	var results []*T
+	for _, node := range nodeMap {
+			if node.Label != expectedLabel {
+					continue
+			}
+			model, err := buildTree[T](node)
+			if err != nil {
+					return nil, err
+			}
+			results = append(results, model)
+	}
+
+	return results, nil
 }
 
-func populateNodeMap(records []neo4j.Record, nodeMap map[string]*BaseNode, root **BaseNode) {
+func getLabelForType[T any]() string {
+	t := reflect.TypeOf((*T)(nil)).Elem()
+	return t.Name()
+}
+
+func populateNodeMap(records []neo4j.Record, nodeMap map[string]*BaseNode) {
 	for _, record := range records {
-		for _, key := range record.Keys {
-			node, ok := record.Get(key)
-			if !ok || node == nil {
-				continue
+			for _, key := range record.Keys {
+					node, ok := record.Get(key)
+					if !ok || node == nil {
+							continue
+					}
+					nodeValue, ok := node.(neo4j.Node)
+					if !ok {
+							continue
+					}
+					nodeID := nodeValue.ElementId
+					if _, exists := nodeMap[nodeID]; !exists {
+							newNode := createNode(nodeValue)
+							nodeMap[nodeID] = newNode
+					}
 			}
-			nodeValue, ok := node.(neo4j.Node)
-			if !ok {
-				continue
-			}
-			nodeID := nodeValue.ElementId
-			if _, exists := nodeMap[nodeID]; !exists {
-				newNode := createNode(nodeValue)
-				nodeMap[nodeID] = newNode
-				if *root == nil && nodeValue.Labels[0] == "User" {
-					*root = newNode
-				}
-			}
-		}
 	}
 }
 
@@ -530,35 +422,113 @@ func createNode(nodeValue neo4j.Node) *BaseNode {
 
 func establishRelationships(records []neo4j.Record, nodeMap map[string]*BaseNode) {
 	for _, record := range records {
-		var parentNode *BaseNode
-		for _, key := range record.Keys {
-			node, ok := record.Get(key)
-			if !ok || node == nil {
-				continue
+			var parentNode *BaseNode
+			for _, key := range record.Keys {
+					node, ok := record.Get(key)
+					if !ok || node == nil {
+							continue
+					}
+					nodeValue, ok := node.(neo4j.Node)
+					if !ok {
+							continue
+					}
+					nodeID := nodeValue.ElementId
+					currentNode, exists := nodeMap[nodeID]
+					if !exists {
+							continue
+					}
+					if parentNode != nil {
+							addChildIfNotExists(parentNode, currentNode)
+					}
+					parentNode = currentNode
 			}
-			nodeValue, ok := node.(neo4j.Node)
-			if !ok {
-				continue
-			}
-			nodeID := nodeValue.ElementId
-			currentNode, exists := nodeMap[nodeID]
-			if !exists {
-				continue
-			}
-			if parentNode != nil {
-				addChildIfNotExists(parentNode, currentNode)
-			}
-			parentNode = currentNode
-		}
 	}
 }
 
 func addChildIfNotExists(parentNode *BaseNode, childNode *BaseNode) {
 	existingChildren := parentNode.GetChildren()
 	for _, child := range existingChildren {
-		if child == childNode {
-			return
-		}
+			if child == childNode {
+				return // Child already exists, skip adding it again
+			}
 	}
-	parentNode.AddChild(childNode)
+	parentNode.AddChild(childNode) // Add the child if it doesn't already exist
+}
+
+
+var modelRegistry = make(map[string]reflect.Type)
+
+func RegisterModel(modelName string, model interface{}) {
+	modelType := reflect.TypeOf(model)
+	if modelType.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("model %s must be a pointer to a struct", modelName))
+	}
+	modelRegistry[modelName] = modelType.Elem()
+}
+
+func mapModels(node *BaseNode) interface{} {
+	mapping, ok := modelRegistry[node.Label]
+	if !ok {
+			fmt.Printf("Label '%s' not found in modelRegistry\n", node.Label) // Debug log
+			return nil
+	}
+
+	modelInstance := reflect.New(mapping).Interface()
+
+	props := node.GetProps()
+	modelValue := reflect.ValueOf(modelInstance).Elem()
+	modelType := modelValue.Type()
+	for i := 0; i < modelValue.NumField(); i++ {
+			field := modelType.Field(i)
+
+			// Map node properties
+			if tag := field.Tag.Get("node"); tag != "" {
+					if value, ok := props[tag]; ok {
+							fieldValue := modelValue.FieldByName(field.Name)
+							if fieldValue.IsValid() && fieldValue.CanSet() {
+									fieldValue.Set(reflect.ValueOf(value))
+							}
+					}
+			}
+
+			// Map relationships
+			if tag := field.Tag.Get("rel"); tag != "" {
+					tagParts := strings.Split(tag, ",")
+					if len(tagParts) != 2 {
+							continue
+					}
+					relType := tagParts[0]
+					relDirection := tagParts[1]
+
+					fieldValue := modelValue.FieldByName(field.Name)
+					if fieldValue.IsValid() && fieldValue.CanSet() && fieldValue.Kind() == reflect.Slice {
+							childSlice := reflect.MakeSlice(fieldValue.Type(), 0, 0)
+							for _, child := range node.GetChildren() {
+									childNode := child.(*BaseNode)
+									if isValidRelationship(relDirection) && childNode.Label == relType {
+											childValue := mapModels(childNode)
+											if childValue != nil {
+													childSlice = reflect.Append(childSlice, reflect.ValueOf(childValue))
+											}
+									}
+							}
+							fieldValue.Set(childSlice)
+					}
+			}
+	}
+
+	return modelInstance
+}
+
+func isValidRelationship(direction string) bool {
+	switch direction {
+	case "->":
+		return true
+	case "<-":
+		return true
+	case "<->":
+		return true
+	default:
+		return false
+	}
 }
