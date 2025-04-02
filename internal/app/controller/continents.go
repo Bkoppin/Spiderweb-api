@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"api/internal/app/models"
+	neoModels "api/internal/app/models/neo"
 	neo "api/internal/app/neo4j"
 	"api/internal/app/routing"
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func createContinent(query string, params map[string]interface{}) (*models.Continent, error) {
+func createContinent(query string, params map[string]interface{}) (*neoModels.Continent, error) {
 	ctx := context.Background()
 	driver, err := neo.NewDriver()
 	if err != nil {
@@ -45,7 +45,7 @@ func createContinent(query string, params map[string]interface{}) (*models.Conti
 	}
 	continentNode := continentValue.(neo4j.Node)
 
-	continent := models.Continent{
+	continent := neoModels.Continent{
 		ID:          continentNode.ElementId,
 		Name:        continentNode.Props["name"].(string),
 		Description: continentNode.Props["description"].(string),
@@ -60,7 +60,7 @@ func createContinent(query string, params map[string]interface{}) (*models.Conti
 }
 
 func CreateContinent(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
-	var continent *models.Continent
+	var continent *neoModels.Continent
 	if err := json.NewDecoder(r.Body).Decode(&continent); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

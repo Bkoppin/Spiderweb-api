@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"api/internal/app/models"
+	neoModels "api/internal/app/models/neo"
 	neo "api/internal/app/neo4j"
 	"api/internal/app/routing"
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func createWorld(query string, params map[string]interface{}) (*models.World, error) {
+func createWorld(query string, params map[string]interface{}) (*neoModels.World, error) {
 	ctx := context.Background()
 	driver, err := neo.NewDriver()
 	if err != nil {
@@ -46,7 +46,7 @@ func createWorld(query string, params map[string]interface{}) (*models.World, er
 	}
 	worldNode := worldValue.(neo4j.Node)
 	
-	world := models.World{
+	world := neoModels.World{
 		ID:					worldNode.ElementId,
 		Name:        worldNode.Props["name"].(string),
 		Type:        worldNode.Props["type"].(string),
@@ -63,7 +63,7 @@ func createWorld(query string, params map[string]interface{}) (*models.World, er
 
 }
 
-func fetchWorld(query string, params map[string]interface{}) (*models.World, error) {
+func fetchWorld(query string, params map[string]interface{}) (*neoModels.World, error) {
 	ctx := context.Background()
 	driver, err := neo.NewDriver()
 	if err != nil {
@@ -90,7 +90,7 @@ func fetchWorld(query string, params map[string]interface{}) (*models.World, err
 	}
 	worldNode := worldValue.(neo4j.Node)
 	
-	world := models.World{
+	world := neoModels.World{
 		ID:					worldNode.ElementId,
 		Name:        worldNode.Props["name"].(string),
 		Type:        worldNode.Props["type"].(string),
@@ -102,7 +102,7 @@ func fetchWorld(query string, params map[string]interface{}) (*models.World, err
 
 
 func CreateWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
-	var world models.World
+	var world neoModels.World
 
 	userID := rctx.GetPathParam("id")
 	if userID == "" {
