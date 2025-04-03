@@ -36,4 +36,3 @@ func Close(db *gorm.DB) error {
 	}
 	return nil
 }
-
