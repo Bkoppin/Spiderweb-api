@@ -7,7 +7,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-
 var developmentSecret = "development"
 
 /* CreateJWT is a function that creates a JWT token

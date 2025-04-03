@@ -19,35 +19,35 @@ func CreateWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 		return
 	}
 
-
 	err := json.NewDecoder(r.Body).Decode(&world)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	
+
 	userIDInt, err := strconv.ParseInt(userID, 10, 64)
+
 	if err != nil {
 		http.Error(w, "invalid userID", http.StatusBadRequest)
 		return
 	}
 
 	err = world.Create(&world, neo.CreateOptions{
-		Rel: "OWNS",
+		Rel:          "OWNS",
 		RelDirection: "<-",
-		Label: "User",
-		Field: "userID",
-		Value: userIDInt,
+		Label:        "User",
+		Field:        "userID",
+		Value:        userIDInt,
 	})
+
 	if err != nil {
 		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	rest.RespondWithSuccess(w, http.StatusCreated, "World created successfully", world)
-	
-	
+
 }
 
 func GetWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
@@ -69,7 +69,41 @@ func GetWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	rest.RespondWithSuccess(w, http.StatusOK, "World retrieved successfully", world)
 }
 
+func PutWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
+	var world neoModels.World
 
+	err := json.NewDecoder(r.Body).Decode(&world)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	err = world.Update(&world, neo.CreateOptions{})
 
+	if err != nil {
+		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
+	rest.RespondWithSuccess(w, http.StatusOK, "World updated successfully", world)
+}
+
+func DeleteWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
+	id := rctx.GetPathParam("id")
+	if id == "" {
+		http.Error(w, "missing id", http.StatusBadRequest)
+		return
+	}
+
+	var world neoModels.World
+	err := world.Delete(&world, "elementID", id, neo.DeleteOptions{
+		Detach: true,
+	})
+
+	if err != nil {
+		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	rest.RespondWithSuccess(w, http.StatusOK, "World deleted successfully", world)
+}

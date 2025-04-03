@@ -70,7 +70,7 @@ func (q *PopulateQuery[T]) executeSingle() error {
 		return fmt.Errorf("failed to convert result to []neo4j.Record")
 	}
 
-	mappedNodes, err := BuildNodeTree[T](recordList)
+	mappedNodes, err := buildNodeTree[T](recordList)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (q *PopulateQuery[T]) executeMultiple() error {
 		return fmt.Errorf("failed to convert result to []neo4j.Record")
 	}
 
-	mappedNodes, err := BuildNodeTree[T](recordList)
+	mappedNodes, err := buildNodeTree[T](recordList)
 	if err != nil {
 		return err
 	}
@@ -137,26 +137,26 @@ func (q *PopulateQuery[T]) executeMultiple() error {
 
 func (q *PopulateQuery[T]) buildQuery() (string, map[string]interface{}) {
 	if q.baseModel.Label == "" {
-			panic("baseModel.Label is not set. Ensure the model's Label field is initialized.")
+		panic("baseModel.Label is not set. Ensure the model's Label field is initialized.")
 	}
 
 	query := fmt.Sprintf("MATCH (n:%s {%s: $%s})", q.baseModel.Label, q.field, q.field)
 	if q.field == "elementID" {
-			query = fmt.Sprintf("MATCH (n:%s) WHERE elementId(n) = $%s", q.baseModel.Label, q.field)
+		query = fmt.Sprintf("MATCH (n:%s) WHERE elementId(n) = $%s", q.baseModel.Label, q.field)
 	}
 	relationships := q.buildRelationships(reflect.TypeOf(*q.model), q.options.Depth)
 	for _, rel := range relationships {
-			query += fmt.Sprintf(" OPTIONAL MATCH %s", rel)
+		query += fmt.Sprintf(" OPTIONAL MATCH %s", rel)
 	}
 
 	if q.options.Limit > 0 {
-			query += fmt.Sprintf(" LIMIT %d", q.options.Limit)
+		query += fmt.Sprintf(" LIMIT %d", q.options.Limit)
 	}
 
 	query += " RETURN n, collect(r) as relatedNodes"
 
 	params := map[string]interface{}{
-			q.field: q.value,
+		q.field: q.value,
 	}
 
 	fmt.Printf("Query -> Neo4j: %s\n", query)
@@ -165,48 +165,48 @@ func (q *PopulateQuery[T]) buildQuery() (string, map[string]interface{}) {
 }
 
 func (q *PopulateQuery[T]) buildRelationships(modelType reflect.Type, depth int) []string {
-    if depth == 0 {
-        depth = -1
-    }
+	if depth == 0 {
+		depth = -1
+	}
 
-    var paths []string
-    for i := 0; i < modelType.NumField(); i++ {
-        field := modelType.Field(i)
-        relTag := field.Tag.Get("rel")
-        if relTag == "" {
-            continue
-        }
+	var paths []string
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
+		relTag := field.Tag.Get("rel")
+		if relTag == "" {
+			continue
+		}
 
-        tagParts := strings.Split(relTag, ",")
-        if len(tagParts) != 2 {
-            continue
-        }
-        relType := tagParts[0]
-        relDirection := tagParts[1]
+		tagParts := strings.Split(relTag, ",")
+		if len(tagParts) != 2 {
+			continue
+		}
+		relType := tagParts[0]
+		relDirection := tagParts[1]
 
-        relatedNodeLabel := ""
-        if field.Type.Kind() == reflect.Ptr {
-            relatedNodeLabel = field.Type.Elem().Name()
-        } else if field.Type.Kind() == reflect.Slice && field.Type.Elem().Kind() == reflect.Ptr {
-            relatedNodeLabel = field.Type.Elem().Elem().Name()
-        } else {
-            relatedNodeLabel = field.Type.Name()
-        }
+		relatedNodeLabel := ""
+		if field.Type.Kind() == reflect.Ptr {
+			relatedNodeLabel = field.Type.Elem().Name()
+		} else if field.Type.Kind() == reflect.Slice && field.Type.Elem().Kind() == reflect.Ptr {
+			relatedNodeLabel = field.Type.Elem().Elem().Name()
+		} else {
+			relatedNodeLabel = field.Type.Name()
+		}
 
-        path := fmt.Sprintf("(n)-[:%s]%s(r:%s)", relType, relDirection, relatedNodeLabel)
-        paths = append(paths, path)
+		path := fmt.Sprintf("(n)-[:%s]%s(r:%s)", relType, relDirection, relatedNodeLabel)
+		paths = append(paths, path)
 
-        if depth != 1 && field.Type.Kind() == reflect.Struct {
-            nestedPaths := q.buildRelationships(field.Type, depth-1)
-            paths = append(paths, nestedPaths...)
-        } else if depth != 1 && field.Type.Kind() == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct {
-            nestedPaths := q.buildRelationships(field.Type.Elem(), depth-1)
-            paths = append(paths, nestedPaths...)
-        } else if depth != 1 && field.Type.Kind() == reflect.Slice && field.Type.Elem().Kind() == reflect.Ptr && field.Type.Elem().Elem().Kind() == reflect.Struct {
-            nestedPaths := q.buildRelationships(field.Type.Elem().Elem(), depth-1)
-            paths = append(paths, nestedPaths...)
-        }
-    }
+		if depth != 1 && field.Type.Kind() == reflect.Struct {
+			nestedPaths := q.buildRelationships(field.Type, depth-1)
+			paths = append(paths, nestedPaths...)
+		} else if depth != 1 && field.Type.Kind() == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct {
+			nestedPaths := q.buildRelationships(field.Type.Elem(), depth-1)
+			paths = append(paths, nestedPaths...)
+		} else if depth != 1 && field.Type.Kind() == reflect.Slice && field.Type.Elem().Kind() == reflect.Ptr && field.Type.Elem().Elem().Kind() == reflect.Struct {
+			nestedPaths := q.buildRelationships(field.Type.Elem().Elem(), depth-1)
+			paths = append(paths, nestedPaths...)
+		}
+	}
 
-    return paths
+	return paths
 }
