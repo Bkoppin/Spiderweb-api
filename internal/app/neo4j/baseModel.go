@@ -1,3 +1,81 @@
+// Package neo provides a simple Object-Graph Mapping (OGM) for Neo4j using Go.
+// It allows you to create, find, update, and delete nodes in the Neo4j database.
+// It also provides a way to establish relationships between nodes.
+// To create a useable model, you need to embed the NeoBaseModel[T] struct in your model.
+// Example:
+//
+//	type User struct {
+//		NeoBaseModel[User]
+//		ID   int    `json:"id" node:"id"`
+//		Name string `json:"name" node:"name"`
+//		Books []*Book `rel:"HAS,->"`
+//	}
+//
+//	RegisterModel("User", &User{})
+//
+//	// The NeoBaseModel[T] struct provides methods for creating, finding, updating, and deleting nodes.
+//	&User{
+//		ID:   1,
+//		Name: "John Doe",
+//	}
+//
+//	// Create a new user
+//	err := dbUser.Create(user, CreateOptions{})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(user)
+//
+//	// Find a user by ID
+//	err := dbUser.Find(user, "id", 1).Populate(PopulateOptions{
+//		Limit: 1,
+//		Depth: 1,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(user)
+//
+//	// Update a user
+//	&User{
+//		ID:   1,
+//		Name: "John Doe Updated",
+//	}
+//	err := dbUser.Update(user, CreateOptions{})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(user)
+//
+//	// Delete a user
+//	err := dbUser.Delete(user, "id", 1, DeleteOptions{
+//		Detach: true,
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println("User deleted")
+//
+//	// You can establish relationships as well by supply a CreateOptions struct
+//	err := dbUser.Create(user, CreateOptions{
+//		Field:        "id",
+//		Value:        123,
+//		Label:        "Book",
+//		Rel:          "HAS",
+//		RelDirection: "->",
+//	})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(user)
+//
+// exported:
+//   - CreateOptions
+//   - DeleteOptions
+//   - PopulateOptions
+//   - NeoBaseModel
+//   - NewDriver
+//   - RegisterModel
 package neo
 
 import (
@@ -213,6 +291,7 @@ func (b *NeoBaseModel[T]) Create(model *T, options CreateOptions) error {
 	ctx := context.Background()
 	session := b.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
+	defer b.driver.Close(ctx)
 
 	query, params := b.buildCreateQuery(model, options)
 
@@ -331,8 +410,8 @@ func (b *NeoBaseModel[T]) Delete(model *T, field string, value interface{}, opti
 	ctx := context.Background()
 	session := b.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
+	defer b.driver.Close(ctx)
 
-	// Step 1: Retrieve the node before deletion
 	queryRetrieve := fmt.Sprintf("MATCH (n:%s {%s: $value}) RETURN n", b.Label, field)
 	if field == "elementID" {
 		queryRetrieve = fmt.Sprintf("MATCH (n:%s) WHERE elementId(n) = $value RETURN n", b.Label)
@@ -363,7 +442,6 @@ func (b *NeoBaseModel[T]) Delete(model *T, field string, value interface{}, opti
 		return err
 	}
 
-	// Map the retrieved node to the model
 	node, ok := result.(neo4j.Node)
 	if !ok {
 		return fmt.Errorf("unexpected result type: %T", result)
@@ -373,7 +451,6 @@ func (b *NeoBaseModel[T]) Delete(model *T, field string, value interface{}, opti
 		return fmt.Errorf("failed to map node to model: %w", err)
 	}
 
-	// Step 2: Delete the node
 	queryDelete := fmt.Sprintf("MATCH (n:%s {%s: $value}) DELETE n", b.Label, field)
 
 	if field == "elementID" {
@@ -396,6 +473,33 @@ func (b *NeoBaseModel[T]) Delete(model *T, field string, value interface{}, opti
 	return err
 }
 
+/*
+@method Update
+
+@description Update a node in the Neo4j database by a specific field and value.
+
+@params model *T - The model to update in the database.
+@params options CreateOptions - Options for adding a relationship to the node, including field, value, label, relationship type, and direction.
+@example
+
+	// Update a node in the Neo4j database
+	user := &User{
+		ID:   1,
+		Name: "John Doe",
+	}
+	options := CreateOptions{
+		Field:        "id",
+		Value:        123,
+		Label:        "World",
+		Rel:          "OWNS",
+		RelDirection: "->",
+	}
+	err := dbUser.Update(user, options)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(user)
+*/
 func (b *NeoBaseModel[T]) Update(model *T, options CreateOptions) error {
 	if err := b.initDriver(); err != nil {
 		return err
@@ -425,12 +529,9 @@ func (b *NeoBaseModel[T]) buildUpdateQuery(model *T, options CreateOptions) (str
 	var queryBuilder strings.Builder
 	params := make(map[string]interface{})
 
-	// Build the MATCH clause for the node to update
-	// Use "elementId" for matching instead of "id"
 	queryBuilder.WriteString(fmt.Sprintf("MATCH (n:%s WHERE elementId(n) = $value) ", b.Label))
 	params["value"] = modelValue.FieldByName("ID").Interface()
 
-	// Build the SET clause for updating the node's properties
 	queryBuilder.WriteString("SET ")
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
@@ -441,7 +542,6 @@ func (b *NeoBaseModel[T]) buildUpdateQuery(model *T, options CreateOptions) (str
 
 		fieldValue := modelValue.Field(i).Interface()
 
-		// Skip the "id" field in the update
 		if nodeTag == "id" {
 			continue
 		}
@@ -451,13 +551,11 @@ func (b *NeoBaseModel[T]) buildUpdateQuery(model *T, options CreateOptions) (str
 		params[nodeTag] = fieldValue
 	}
 
-	// Remove the trailing comma and space from the SET clause
 	query := queryBuilder.String()
 	query = strings.TrimSuffix(query, ", ")
 	queryBuilder.Reset()
 	queryBuilder.WriteString(query)
 
-	// Add optional relationship handling if CreateOptions are provided
 	if options.Field != "" && options.Value != nil && options.Label != "" {
 		queryBuilder.WriteString(fmt.Sprintf(" MERGE (r:%s {%s: $relatedValue})", options.Label, options.Field))
 		if options.RelDirection == "->" {

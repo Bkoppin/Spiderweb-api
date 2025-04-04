@@ -67,6 +67,12 @@ type ServeOptions struct {
 	Message string
 	Logging bool
 }
+/*
+type Router: A struct that holds middleware and a Mux instance.
+This struct is used to manage the routing of HTTP requests and apply middleware to routes.
+	- @property middleware: A slice of Middleware functions to be applied to the router.
+	- @property mux: A Mux instance that handles the actual routing of HTTP requests.
+*/
 type Router struct {
 	middleware []Middleware
 	mux        *Mux
@@ -122,6 +128,12 @@ func (c Context) GetPathParam: Returns the value of a path parameter by its key.
 This method retrieves the value of a path parameter from the PathParams map in the Context struct.
   - @param key: The key of the path parameter to retrieve.
   - @return: The value of the specified path parameter.
+Example usage:
+	func myHandler(w http.ResponseWriter, r *http.Request, ctx Context) {
+		id := ctx.GetPathParam("id")
+		// Use the id parameter for further processing
+	}
+
 */
 func (c Context) GetPathParam(key string) string {
 	return c.PathParams[key]
@@ -132,6 +144,12 @@ func (c Context) GetQueryParam: Returns the value of a query parameter by its ke
 This method retrieves the value of a query parameter from the QueryParams map in the Context struct.
   - @param key: The key of the query parameter to retrieve.
   - @return: The value of the specified query parameter.
+
+Example usage:
+  func myHandler(w http.ResponseWriter, r *http.Request, ctx Context) {
+		id := ctx.GetQueryParam("sort")
+		// Use the id parameter for further processing
+	}
 */
 func (c Context) GetQueryParam(key string) string {
 	return c.QueryParams[key]
@@ -141,6 +159,12 @@ func (c Context) GetQueryParam(key string) string {
 func NewRouter: Creates a new Router instance with an empty middleware chain and a new Mux instance.
 This function initializes a Router struct with an empty slice of middleware and a new Mux instance.
   - @return: A new Router instance.
+
+Example usage:
+	router := NewRouter()
+	router.Use(myMiddleware)
+	router.Handle("GET", "/api/v1/resource", myHandler)
+	router.Serve("8080", ServeOptions{Message: "Server started on port 8080"})
 */
 func NewRouter() *Router {
 	return &Router{
@@ -154,6 +178,12 @@ func NewRouter() *Router {
 //
 // Parameters:
 //   - m: The middleware to be added to the Router's middleware chain.
+//   - This method appends the provided middleware to the Router's middleware slice and updates the mux.RouterMiddleware with the new middleware list.
+//   - This allows the middleware to be applied to all routes handled by the Router.
+// Example usage:
+//   router := NewRouter()
+//   router.Use(myMiddleware)
+//   router.Handle("GET", "/api/v1/resource", myHandler)
 func (r *Router) Use(m Middleware) {
 	r.middleware = append(r.middleware, m)
 	r.mux.RouterMiddleware = r.middleware
@@ -167,6 +197,10 @@ This method adds a new route to the Router's internal mux and returns a Route in
   - @param handler: The handler function for the route, which takes an http.ResponseWriter, an http.Request, and a Context.
   - @param middleware: A variadic list of middleware functions to be applied to the route.
   - @return: A Route instance representing the registered route.
+
+Example usage:
+	router := NewRouter()
+	router.Handle("GET", "/api/v1/resource", myHandler, myMiddleware1, myMiddleware2)
 */
 func (r *Router) Handle(method string, path string, handler HTTPHandlerWithContext, middleware ...Middleware) *Route {
 	route := Route{
@@ -186,6 +220,11 @@ This method initializes the server with the specified port and options, and star
   - @param port: The port on which the server will listen for incoming requests.
   - @param options: A ServeOptions instance containing options for serving the router.
   - @return: An error if the server fails to start.
+
+Example usage:
+	router := NewRouter()
+	router.Serve("8080", ServeOptions{Message: "Server started on port 8080"})
+
 */
 func (r *Router) Serve(port string, options ServeOptions) error {
 	if options.Logging {
