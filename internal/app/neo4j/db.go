@@ -10,6 +10,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+/*
+NewDriver initializes a new Neo4j driver using environment variables.
+It loads the Neo4j connection details from a .env file and verifies the connectivity to the database.
+It returns a neo4j.DriverWithContext instance or an error if the connection fails.
+The .env file should contain the following variables:
+	- NEO4J_URI: The URI of the Neo4j database.
+	- NEO4J_USER: The username for the Neo4j database.
+	- NEO4J_PASSWORD: The password for the Neo4j database.
+*/
 func NewDriver() (neo4j.DriverWithContext, error) {
 	err := godotenv.Load()
 	if err != nil {
@@ -159,6 +168,20 @@ func resolveTypeFromLabels(labels []string) (reflect.Type, error) {
 
 var modelRegistry = make(map[string]reflect.Type)
 
+/*
+RegisterModel registers a neo4j model type with a string name.
+This allows the mapping function to resolve the correct type based on the node's labels.
+The model must be a pointer to a struct.
+
+Example usage:
+	type User struct {
+		ID       string `node:"id"`
+		Username string `node:"username"`
+		Books    []*Book `rel:"HAS,->"`
+	}
+
+	RegisterModel("User", &User{})
+*/
 func RegisterModel(modelName string, model interface{}) {
 	modelType := reflect.TypeOf(model)
 	if modelType.Kind() != reflect.Ptr {

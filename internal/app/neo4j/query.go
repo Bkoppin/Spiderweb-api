@@ -42,6 +42,7 @@ func (q *PopulateQuery[T]) executeSingle() error {
 	ctx := context.Background()
 	session := q.baseModel.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
+	defer q.baseModel.driver.Close(ctx)
 
 	query, params := q.buildQuery()
 	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (interface{}, error) {
@@ -91,6 +92,7 @@ func (q *PopulateQuery[T]) executeMultiple() error {
 	ctx := context.Background()
 	session := q.baseModel.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
+	defer q.baseModel.driver.Close(ctx)
 
 	query, params := q.buildQuery()
 	records, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (interface{}, error) {
