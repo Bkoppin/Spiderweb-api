@@ -23,6 +23,24 @@ type PopulateQuery[T any] struct {
 	options   PopulateOptions
 }
 
+// @method Populate
+//
+// @description Populates a single model or a slice of models with related nodes from Neo4j.
+//
+// @param options PopulateOptions
+//
+// @return error
+//
+// @example
+//
+//	// Populate a single model
+//	var user User
+//	user := User{}
+//	err := user.Find(&user, "userID", 123).Populate(PopulateOptions{Depth: 2})
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(user)
 func (q *PopulateQuery[T]) Populate(options PopulateOptions) error {
 	q.options = options
 	if q.model != nil {
