@@ -71,12 +71,20 @@ func GetWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 
 func PutWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	var world neoModels.World
+	worldID := rctx.GetPathParam("id")
 
+	if worldID == "" {
+		http.Error(w, "missing id", http.StatusBadRequest)
+		return
+	}
 	err := json.NewDecoder(r.Body).Decode(&world)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	world.ID = worldID
 
 	err = world.Update(&world, neo.CreateOptions{})
 

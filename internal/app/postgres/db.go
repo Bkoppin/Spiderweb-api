@@ -13,7 +13,7 @@ import (
 Connect initializes a new PostgreSQL database connection using environment variables.
 It loads the database connection details from a .env file and returns a gorm.DB instance or an error if the connection fails.
 The .env file should contain the following variable:
-	- POSTGRES_URI: The URI of the PostgreSQL database.
+  - POSTGRES_URI: The URI of the PostgreSQL database.
 */
 func Connect() (*gorm.DB, error) {
 	err := godotenv.Load()
