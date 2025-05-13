@@ -21,6 +21,7 @@ func main() {
 	router := routing.NewRouter()
 	router.Use(middleware.Cors)
 	router.Use(middleware.ContentTypeJSON)
+	router.Handle("POST", "/api/auth/login", controller.Login)
 	router.Handle("POST", "/api/user", controller.CreateUser)
 	router.Handle("GET", "/api/user/:id", controller.GetUser)
 	router.Handle("GET", "/api/user/:id/worlds", controller.GetUserWorlds)

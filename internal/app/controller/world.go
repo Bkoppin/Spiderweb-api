@@ -3,7 +3,6 @@ package controller
 import (
 	neoModels "api/internal/app/models/neo"
 	neo "api/internal/app/neo4j"
-	"api/internal/app/rest"
 	"api/internal/app/routing"
 	"encoding/json"
 	"net/http"
@@ -42,11 +41,12 @@ func CreateWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusCreated, "World created successfully", world)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(world)
 
 }
 
@@ -63,10 +63,16 @@ func GetWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		if err.Error() == "not found" {
+			http.Error(w, "World not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusOK, "World retrieved successfully", world)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(world)
 }
 
 func PutWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
@@ -89,11 +95,16 @@ func PutWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	err = world.Update(&world, neo.CreateOptions{})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		if err.Error() == "not found" {
+			http.Error(w, "World not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusOK, "World updated successfully", world)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(world)
 }
 
 func DeleteWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
@@ -109,9 +120,14 @@ func DeleteWorld(w http.ResponseWriter, r *http.Request, rctx routing.Context) {
 	})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		if err.Error() == "not found" {
+			http.Error(w, "World not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusOK, "World deleted successfully", world)
+	w.WriteHeader(http.StatusNoContent)
+	json.NewEncoder(w).Encode(nil)
 }

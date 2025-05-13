@@ -5,7 +5,6 @@ import (
 	neoModels "api/internal/app/models/neo"
 	neo "api/internal/app/neo4j"
 	"api/internal/app/postgres"
-	"api/internal/app/rest"
 	"api/internal/app/routing"
 	"encoding/json"
 	"net/http"
@@ -16,19 +15,19 @@ func CreateUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 	var user models.User
 	db, err := postgres.Connect()
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, "Failed to connect to database")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		rest.RespondWithError(w, http.StatusBadRequest, "Failed to decode request body")
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	res := db.Create(&user)
+	res := db.Create(&user).Omit("password")
 	if res.Error != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, "Failed to create user")
+		http.Error(w, res.Error.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -40,56 +39,58 @@ func CreateUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 	err = neoUser.Create(&neoUser, neo.CreateOptions{})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, "Failed to create user in Neo4j")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	data := map[string]interface{}{
-		"username": user.Username,
-		"id":       user.ID,
-	}
-	rest.RespondWithSuccess(w, http.StatusCreated, "User created successfully", data)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(neoUser)
+	
+	
 }
 
 func GetUser(w http.ResponseWriter, r *http.Request, context routing.Context) {
 	db, err := postgres.Connect()
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, "Failed to connect to database")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	id := context.GetPathParam("id")
 	if id == "" {
-		rest.RespondWithError(w, http.StatusBadRequest, "Missing user ID")
+		http.Error(w, "Missing user ID", http.StatusBadRequest)
 		return
 	}
 
 	if _, err := strconv.ParseInt(id, 10, 64); err != nil {
-		rest.RespondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
 	var user models.User
 	res := db.First(&user, id).Omit("password")
+
 	if res.Error != nil {
-		rest.RespondWithError(w, http.StatusNotFound, "User not found")
+		http.Error(w, res.Error.Error(), http.StatusNotFound)
 		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusOK, "User retrieved successfully", user)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+
 }
 
 func GetUserWorlds(w http.ResponseWriter, r *http.Request, context routing.Context) {
 	id := context.GetPathParam("id")
 	if id == "" {
-		rest.RespondWithError(w, http.StatusBadRequest, "Missing user ID")
+		http.Error(w, "Missing user ID", http.StatusBadRequest)
 		return
 	}
 
 	parsedID, err := strconv.ParseInt(id, 10, 64)
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
@@ -99,58 +100,52 @@ func GetUserWorlds(w http.ResponseWriter, r *http.Request, context routing.Conte
 	})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if len(user.Worlds) == 0 {
-		rest.RespondWithError(w, http.StatusNotFound, "No worlds found for user")
+		http.Error(w, "No worlds found for this user", http.StatusNotFound)
 		return
 	}
-	rest.RespondWithSuccess(w, http.StatusOK, "Worlds retrieved successfully", user.Worlds)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user.Worlds)
 }
 
 func Login(w http.ResponseWriter, r *http.Request, context routing.Context) {
 	var user models.User
 	db, err := postgres.Connect()
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, "Failed to connect to database")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		rest.RespondWithError(w, http.StatusBadRequest, "Failed to decode request body")
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	var dbUser models.User
 
-	res := db.Where("username = ?", user.Username).First(&dbUser)
+	res := db.Where("username = ?", user.Username).First(&dbUser).Omit("password")
 	if res.Error != nil {
-		rest.RespondWithError(w, http.StatusNotFound, "User not found")
+		http.Error(w, "Invalid Credentials", http.StatusNotFound)
 		return
 	}
 
 	if !dbUser.ComparePassword(user.Password) {
-		rest.RespondWithError(w, http.StatusUnauthorized, "Invalid password")
+		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
 
-	data := map[string]interface{}{
-		"username": dbUser.Username,
-		"id":       dbUser.ID,
-	}
-	rest.RespondWithSuccess(w, http.StatusOK, "Login successful", data)
-}
-
-func Test(w http.ResponseWriter, r *http.Request, context routing.Context) {
-	rest.RespondWithSuccess(w, http.StatusOK, "Hello, World!", nil)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(dbUser)
 }
 
 func GetNeoUser(w http.ResponseWriter, r *http.Request, context routing.Context) {
 	if context.GetPathParam("id") == "" {
-		rest.RespondWithError(w, http.StatusBadRequest, "Missing user ID")
+		http.Error(w, "Missing user ID", http.StatusBadRequest)
 		return
 	}
 	idParam := context.GetPathParam("id")
@@ -158,7 +153,7 @@ func GetNeoUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 	id, err := strconv.ParseInt(idParam, 10, 64)
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusBadRequest, "Invalid user ID")
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
@@ -168,9 +163,10 @@ func GetNeoUser(w http.ResponseWriter, r *http.Request, context routing.Context)
 	})
 
 	if err != nil {
-		rest.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	rest.RespondWithSuccess(w, http.StatusOK, "User retrieved successfully", user)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
 }
